@@ -47,10 +47,13 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
     console.log('✓ Homepage loaded successfully\n')
     
     // ====================================
-    // Step 2: Click "Create from idea"
+    // Step 2: Ensure "一句话生成" tab is selected (it's selected by default)
     // ====================================
-    console.log('🖱️  Step 2: Clicking "Create from idea"...')
-    await page.click('text=/从想法创建/i')
+    console.log('🖱️  Step 2: Ensuring "一句话生成" tab is selected...')
+    // The "一句话生成" tab is selected by default, but we can click it to ensure it's active
+    await page.click('button:has-text("一句话生成")').catch(() => {
+      // If click fails, the tab might already be selected, which is fine
+    })
     
     // Wait for form to appear
     await page.waitForSelector('textarea, input[type="text"]', { timeout: 10000 })
@@ -303,12 +306,17 @@ test.describe('UI E2E - Simplified (skip long waits)', () => {
     await page.goto('http://localhost:3000')
     console.log('✓ Homepage loaded')
     
-    // Click create
-    await page.click('text=/从想法创建/i')
+    // Ensure "一句话生成" tab is selected (it's selected by default)
+    await page.click('button:has-text("一句话生成")').catch(() => {
+      // If click fails, the tab might already be selected, which is fine
+    })
     console.log('✓ Entered create page')
     
+    // Wait for textarea to be visible
+    await page.waitForSelector('textarea', { timeout: 10000 })
+    
     // Enter content
-    const ideaInput = page.locator('textarea, input[type="text"]').first()
+    const ideaInput = page.locator('textarea').first()
     await ideaInput.fill('E2E test project')
     console.log('✓ Entered content')
     
