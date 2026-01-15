@@ -10,7 +10,9 @@ Configuration Priority (highest to lowest):
     3. Default values
 
 Environment Variables:
-    AI_PROVIDER_FORMAT: "gemini" (default), "openai", or "vertex"
+    AI_PROVIDER_FORMAT: "gemini" (default), "openai", or "vertex" - applies to both text and image
+    AI_TEXT_PROVIDER_FORMAT: Optional, overrides AI_PROVIDER_FORMAT for text generation
+    AI_IMAGE_PROVIDER_FORMAT: Optional, overrides AI_PROVIDER_FORMAT for image generation
 
     For Gemini format (Google GenAI SDK):
         GOOGLE_API_KEY: API key
@@ -41,31 +43,74 @@ __all__ = [
 ]
 
 
-def get_provider_format() -> str:
+def get_provider_format(provider_type: str = None) -> str:
     """
     Get the configured AI provider format
 
-    Priority:
-        1. Flask app.config['AI_PROVIDER_FORMAT'] (from database settings)
-        2. Environment variable AI_PROVIDER_FORMAT
-        3. Default: 'gemini'
+    Priority (for specific provider types like 'text' or 'image'):
+        1. Environment variable AI_TEXT_PROVIDER_FORMAT or AI_IMAGE_PROVIDER_FORMAT (highest priority)
+        2. Flask app.config['AI_TEXT_PROVIDER_FORMAT'] or ['AI_IMAGE_PROVIDER_FORMAT'] (from database settings)
+        3. Flask app.config['AI_PROVIDER_FORMAT'] (legacy database setting, applies to both)
+        4. Environment variable AI_PROVIDER_FORMAT (legacy env var, applies to both)
+        5. Default: 'gemini'
+
+    Note: Specific environment variables (AI_TEXT/IMAGE_PROVIDER_FORMAT) take priority over
+          the database's general AI_PROVIDER_FORMAT setting to allow easy overrides without
+          changing database settings.
+
+    Args:
+        provider_type: 'text' or 'image' to get specific provider format. If None, returns general format.
 
     Returns:
         "gemini", "openai", or "vertex"
     """
-    # Try to get from Flask app config first (database settings)
+    # Determine config key based on provider type
+    if provider_type == 'text':
+        specific_key = 'AI_TEXT_PROVIDER_FORMAT'
+        env_key = 'AI_TEXT_PROVIDER_FORMAT'
+    elif provider_type == 'image':
+        specific_key = 'AI_IMAGE_PROVIDER_FORMAT'
+        env_key = 'AI_IMAGE_PROVIDER_FORMAT'
+    else:
+        specific_key = None
+        env_key = None
+    
+    # PRIORITY 1: Try environment variable for specific provider type FIRST
+    # This allows easy override without touching database settings
+    if env_key:
+        specific_value = os.getenv(env_key)
+        if specific_value:
+            logger.debug(f"Using {env_key} from environment: {specific_value}")
+            return specific_value.lower()
+    
+    # PRIORITY 2: Try to get from Flask app config (database settings)
     try:
         from flask import current_app
         if current_app and hasattr(current_app, 'config'):
+            # Try specific provider type in database
+            if specific_key:
+                config_value = current_app.config.get(specific_key)
+                if config_value:
+                    logger.debug(f"Using {specific_key} from app.config: {config_value}")
+                    return str(config_value).lower()
+            # Fall back to general AI_PROVIDER_FORMAT from database
             config_value = current_app.config.get('AI_PROVIDER_FORMAT')
             if config_value:
+                logger.debug(f"Using AI_PROVIDER_FORMAT from app.config: {config_value}")
                 return str(config_value).lower()
     except RuntimeError:
         # Not in Flask application context
         pass
     
-    # Fallback to environment variable
-    return os.getenv('AI_PROVIDER_FORMAT', 'gemini').lower()
+    # PRIORITY 3: Fallback to general environment variable
+    general_value = os.getenv('AI_PROVIDER_FORMAT')
+    if general_value:
+        logger.debug(f"Using AI_PROVIDER_FORMAT from environment: {general_value}")
+        return general_value.lower()
+    
+    # PRIORITY 4: Default
+    logger.debug("Using default provider format: gemini")
+    return 'gemini'
 
 
 def _get_config_value(key: str, default: str = None) -> str:
@@ -100,7 +145,7 @@ def _get_config_value(key: str, default: str = None) -> str:
     return None
 
 
-def _get_provider_config() -> Dict[str, Any]:
+def _get_provider_config(provider_type: str = None) -> Dict[str, Any]:
     """
     Get provider configuration based on AI_PROVIDER_FORMAT
 
@@ -108,6 +153,9 @@ def _get_provider_config() -> Dict[str, Any]:
         1. Flask app.config (from database settings)
         2. Environment variables
         3. Default values
+
+    Args:
+        provider_type: 'text' or 'image' to get specific provider config
 
     Returns:
         Dict with keys:
@@ -118,7 +166,7 @@ def _get_provider_config() -> Dict[str, Any]:
     Raises:
         ValueError: If required configuration is not set
     """
-    provider_format = get_provider_format()
+    provider_format = get_provider_format(provider_type)
 
     if provider_format == 'vertex':
         # Vertex AI format
@@ -183,7 +231,7 @@ def get_text_provider(model: str = "gemini-3-flash-preview") -> TextProvider:
     Returns:
         TextProvider instance (GenAITextProvider or OpenAITextProvider)
     """
-    config = _get_provider_config()
+    config = _get_provider_config(provider_type='text')
     provider_format = config['format']
 
     if provider_format == 'openai':
@@ -216,7 +264,7 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
         OpenAI format does NOT support 4K resolution, only 1K is available.
         If you need higher resolution images, use Gemini or Vertex AI format.
     """
-    config = _get_provider_config()
+    config = _get_provider_config(provider_type='image')
     provider_format = config['format']
 
     if provider_format == 'openai':
@@ -233,4 +281,4 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
         )
     else:
         logger.info(f"Using Gemini format for image generation, model: {model}")
-        return GenAIImageProvider(api_key=config['api_key'], api_base=config['api_base'], model=model)
+        return GenAIImageProvider(api_key=config['api_key'], api_base=config['api_base'], model=model, vertexai=False)
