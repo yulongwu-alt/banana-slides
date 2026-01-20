@@ -165,23 +165,34 @@ def _load_settings_to_config(app):
         # Load API configuration
         # Note: We load even if value is None/empty to allow clearing settings
         # But we only log if there's an actual value
+        # Only load database settings if specific provider env vars are NOT set
+        # This allows using separate keys for different providers via .env
+        google_key_from_env = os.getenv('GOOGLE_API_KEY')
+        openai_key_from_env = os.getenv('OPENAI_API_KEY')
+        google_base_from_env = os.getenv('GOOGLE_API_BASE')
+        openai_base_from_env = os.getenv('OPENAI_API_BASE')
+        
         if settings.api_base_url is not None:
-            # 将数据库中的统一 API Base 同步到 Google/OpenAI 两个配置，确保覆盖环境变量
-            app.config['GOOGLE_API_BASE'] = settings.api_base_url
-            app.config['OPENAI_API_BASE'] = settings.api_base_url
+            # Only apply to providers that don't have env-specific settings
+            if not google_base_from_env:
+                app.config['GOOGLE_API_BASE'] = settings.api_base_url
+            if not openai_base_from_env:
+                app.config['OPENAI_API_BASE'] = settings.api_base_url
             if settings.api_base_url:
                 logging.info(f"Loaded API_BASE from settings: {settings.api_base_url}")
             else:
-                logging.info("API_BASE is empty in settings, using env var or default")
+                logging.info("API_BASE is empty in settings")
 
         if settings.api_key is not None:
-            # 同步到两个提供商的 key，数据库优先于环境变量
-            app.config['GOOGLE_API_KEY'] = settings.api_key
-            app.config['OPENAI_API_KEY'] = settings.api_key
+            # Only apply to providers that don't have env-specific settings
+            if not google_key_from_env:
+                app.config['GOOGLE_API_KEY'] = settings.api_key
+            if not openai_key_from_env:
+                app.config['OPENAI_API_KEY'] = settings.api_key
             if settings.api_key:
-                logging.info("Loaded API key from settings")
+                logging.info("Loaded API key from settings (for providers without env vars)")
             else:
-                logging.info("API key is empty in settings, using env var or default")
+                logging.info("API key is empty in settings")
 
         # Load image generation settings
         app.config['DEFAULT_RESOLUTION'] = settings.image_resolution

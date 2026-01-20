@@ -188,12 +188,12 @@ def _get_provider_config(provider_type: str = None) -> Dict[str, Any]:
         }
 
     elif provider_format == 'openai':
-        api_key = _get_config_value('OPENAI_API_KEY') or _get_config_value('GOOGLE_API_KEY')
+        api_key = _get_config_value('OPENAI_API_KEY')
         api_base = _get_config_value('OPENAI_API_BASE', 'https://aihubmix.com/v1')
 
         if not api_key:
             raise ValueError(
-                "OPENAI_API_KEY or GOOGLE_API_KEY (from database settings or environment) is required when AI_PROVIDER_FORMAT=openai."
+                "OPENAI_API_KEY (from database settings or environment) is required when AI_PROVIDER_FORMAT=openai."
             )
 
         logger.info(f"Provider config - format: openai, api_base: {api_base}")

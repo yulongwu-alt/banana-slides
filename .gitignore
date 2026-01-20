@@ -55,3 +55,4 @@ uploads/
 *.orig
 # 本地备份目录（保存测试文件等）
 _local_backup/
+.env.old
