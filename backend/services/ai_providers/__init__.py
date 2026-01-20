@@ -196,7 +196,7 @@ def _get_provider_config(provider_type: str = None) -> Dict[str, Any]:
                 "OPENAI_API_KEY (from database settings or environment) is required when AI_PROVIDER_FORMAT=openai."
             )
 
-        logger.info(f"Provider config - format: openai, api_base: {api_base}")
+        logger.info(f"Provider config - format: openai, api_base: {api_base}, api_key: ***{api_key[-4:] if api_key else 'NONE'}")
 
         return {
             'format': 'openai',

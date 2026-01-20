@@ -172,27 +172,34 @@ def _load_settings_to_config(app):
         google_base_from_env = os.getenv('GOOGLE_API_BASE')
         openai_base_from_env = os.getenv('OPENAI_API_BASE')
         
+        # Log which keys are available
+        logging.info(f"API Keys - GOOGLE from env: {'YES (***' + google_key_from_env[-4:] + ')' if google_key_from_env else 'NO'}, "
+                    f"OPENAI from env: {'YES (***' + openai_key_from_env[-4:] + ')' if openai_key_from_env else 'NO'}, "
+                    f"DB key: {'YES (***' + settings.api_key[-4:] + ')' if settings.api_key else 'NO'}")
+        
         if settings.api_base_url is not None:
             # Only apply to providers that don't have env-specific settings
             if not google_base_from_env:
                 app.config['GOOGLE_API_BASE'] = settings.api_base_url
+                logging.info(f"Applied DB API_BASE to GOOGLE_API_BASE: {settings.api_base_url}")
             if not openai_base_from_env:
                 app.config['OPENAI_API_BASE'] = settings.api_base_url
-            if settings.api_base_url:
-                logging.info(f"Loaded API_BASE from settings: {settings.api_base_url}")
-            else:
-                logging.info("API_BASE is empty in settings")
+                logging.info(f"Applied DB API_BASE to OPENAI_API_BASE: {settings.api_base_url}")
 
         if settings.api_key is not None:
             # Only apply to providers that don't have env-specific settings
             if not google_key_from_env:
                 app.config['GOOGLE_API_KEY'] = settings.api_key
+                logging.info("Applied DB api_key to GOOGLE_API_KEY")
             if not openai_key_from_env:
                 app.config['OPENAI_API_KEY'] = settings.api_key
-            if settings.api_key:
-                logging.info("Loaded API key from settings (for providers without env vars)")
-            else:
-                logging.info("API key is empty in settings")
+                logging.info("Applied DB api_key to OPENAI_API_KEY")
+        
+        # Log final configuration
+        final_google_key = app.config.get('GOOGLE_API_KEY')
+        final_openai_key = app.config.get('OPENAI_API_KEY')
+        logging.info(f"Final API Keys - GOOGLE_API_KEY: {'***' + final_google_key[-4:] if final_google_key else 'NOT SET'}, "
+                    f"OPENAI_API_KEY: {'***' + final_openai_key[-4:] if final_openai_key else 'NOT SET'}")
 
         # Load image generation settings
         app.config['DEFAULT_RESOLUTION'] = settings.image_resolution
