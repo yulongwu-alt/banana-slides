@@ -98,6 +98,19 @@ def fetch_auth_user_data(auth_header: str) -> dict | None:
     return data if isinstance(data, dict) else {}
 
 
+def _get_request_auth_header() -> str | None:
+    """Return the bearer token from the request header or auth cookie."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        return auth_header
+
+    access_token = request.cookies.get("access_token")
+    if access_token:
+        return f"Bearer {access_token}"
+
+    return None
+
+
 def register_auth_middleware(app):
     """Register request authentication middleware on the Flask app."""
 
@@ -109,9 +122,9 @@ def register_auth_middleware(app):
         if request.path in PUBLIC_AUTH_PATHS:
             return None
 
-        auth_header = request.headers.get("Authorization")
+        auth_header = _get_request_auth_header()
         if not auth_header:
-            return jsonify({"detail": "Missing authorization header"}), 401
+            return jsonify({"detail": "Missing authorization token"}), 401
 
         try:
             data = fetch_auth_user_data(auth_header)

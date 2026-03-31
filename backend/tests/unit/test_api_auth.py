@@ -6,11 +6,23 @@ from controllers.auth_controller import UpstreamUnavailable
 
 
 class TestAuthMiddleware:
-    def test_protected_route_requires_authorization_header(self, unauthenticated_client):
+    def test_protected_route_requires_authorization_token(self, unauthenticated_client):
         response = unauthenticated_client.get('/api/projects')
 
         assert response.status_code == 401
-        assert response.get_json() == {'detail': 'Missing authorization header'}
+        assert response.get_json() == {'detail': 'Missing authorization token'}
+
+    def test_protected_route_accepts_access_token_cookie(self, unauthenticated_client):
+        unauthenticated_client.set_cookie('access_token', 'cookie-token')
+
+        with patch(
+            'controllers.auth_controller.fetch_auth_user_data',
+            return_value={'success': True, 'data': {'email': 'cookie@example.com'}},
+        ) as fetch_auth_user_data:
+            response = unauthenticated_client.get('/api/projects')
+
+        assert response.status_code == 200
+        fetch_auth_user_data.assert_called_once_with('Bearer cookie-token')
 
     def test_protected_route_rejects_invalid_token(self, unauthenticated_client):
         with patch('controllers.auth_controller.fetch_auth_user_data', return_value=None):
