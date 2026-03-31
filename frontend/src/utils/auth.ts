@@ -5,7 +5,7 @@ const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 const SSO_REDIRECT_URI = 'https://slides.yo-star.com';
 
 export const SSO_AUTHORIZE_URL =
-  'https://idaas.yostar.net/oauth/authorize?response_type=code&scope=read&client_id=6cda083476ddfa8af792191027b982b2yq5BqELBMA8&redirect_uri=https%3A%2F%2Fslides.yo-star.com%2F&state=bdcc926bf498e3e266306f0389201108my9cAflj0RT_idp';
+  'https://idaas.yostar.net/oauth/authorize?response_type=code&scope=read&client_id=6cda083476ddfa8af792191027b982b2yq5BqELBMA8&redirect_uri=https%3A%2F%2Fslides.yo-star.com&state=75d9906504243e40b0d1f56fae03aaedqlkAcgTkpu9_idp';
 
 type TokenResponse = {
   access_token?: string;
