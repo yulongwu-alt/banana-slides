@@ -1,124 +1,153 @@
-"""
-项目管理API单元测试
-"""
+"""Project API unit tests."""
 
 import pytest
-from conftest import assert_success_response, assert_error_response
+
+from conftest import assert_success_response
+from models import Project
 
 
 class TestProjectCreate:
-    """项目创建测试"""
-    
+    """Project creation tests."""
+
     def test_create_project_idea_mode(self, client):
-        """测试从想法创建项目"""
         response = client.post('/api/projects', json={
             'creation_type': 'idea',
-            'idea_prompt': '生成一份关于AI的PPT'
+            'idea_prompt': 'Generate an AI presentation',
         })
-        
+
         data = assert_success_response(response, 201)
         assert 'project_id' in data['data']
+        assert data['data']['user_email'] == 'test@example.com'
         assert data['data']['status'] == 'DRAFT'
-    
+
+        detail = assert_success_response(client.get(f"/api/projects/{data['data']['project_id']}"))
+        assert detail['data']['user_email'] == 'test@example.com'
+
     def test_create_project_outline_mode(self, client):
-        """测试从大纲创建项目"""
         response = client.post('/api/projects', json={
             'creation_type': 'outline',
             'outline': [
-                {'title': '第一页', 'points': ['要点1']},
-                {'title': '第二页', 'points': ['要点2']}
-            ]
+                {'title': 'Page 1', 'points': ['Point 1']},
+                {'title': 'Page 2', 'points': ['Point 2']},
+            ],
         })
-        
+
         data = assert_success_response(response, 201)
         assert 'project_id' in data['data']
-    
+
     def test_create_project_missing_type(self, client):
-        """测试缺少creation_type参数"""
         response = client.post('/api/projects', json={
-            'idea_prompt': '测试'
+            'idea_prompt': 'Test',
         })
-        
-        # 应该返回错误
+
         assert response.status_code in [400, 422]
-    
+
     def test_create_project_invalid_type(self, client):
-        """测试无效的creation_type"""
         response = client.post('/api/projects', json={
             'creation_type': 'invalid_type',
-            'idea_prompt': '测试'
+            'idea_prompt': 'Test',
         })
-        
+
         assert response.status_code in [400, 422]
 
 
 class TestProjectGet:
-    """项目获取测试"""
-    
+    """Project retrieval tests."""
+
     def test_get_project_success(self, client, sample_project):
-        """测试获取项目成功"""
         if not sample_project:
-            pytest.skip("项目创建失败")
-        
+            pytest.skip("Project creation failed")
+
         project_id = sample_project['project_id']
         response = client.get(f'/api/projects/{project_id}')
-        
+
         data = assert_success_response(response)
         assert data['data']['project_id'] == project_id
-    
-    def test_get_project_not_found(self, client):
-        """测试获取不存在的项目"""
-        response = client.get('/api/projects/non-existent-id')
-        
+
+    def test_get_project_filters_by_authenticated_user_email(self, client, db_session):
+        foreign_project = Project(
+            creation_type='idea',
+            user_email='other@example.com',
+            idea_prompt='Foreign project',
+            status='DRAFT',
+        )
+        db_session.add(foreign_project)
+        db_session.commit()
+
+        response = client.get(f'/api/projects/{foreign_project.id}')
+
         assert response.status_code == 404
-    
+
+    def test_get_project_not_found(self, client):
+        response = client.get('/api/projects/non-existent-id')
+        assert response.status_code == 404
+
     def test_get_project_invalid_id_format(self, client):
-        """测试无效的项目ID格式"""
         response = client.get('/api/projects/invalid!@#$%id')
-        
-        # 可能返回404或400
         assert response.status_code in [400, 404]
 
 
 class TestProjectUpdate:
-    """项目更新测试"""
-    
+    """Project update tests."""
+
     def test_update_project_status(self, client, sample_project):
-        """测试更新项目状态"""
         if not sample_project:
-            pytest.skip("项目创建失败")
-        
+            pytest.skip("Project creation failed")
+
         project_id = sample_project['project_id']
         response = client.put(f'/api/projects/{project_id}', json={
-            'status': 'GENERATING'
+            'status': 'GENERATING',
         })
-        
-        # 状态更新应该成功
+
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
+        assert data['data']['user_email'] == 'test@example.com'
+
+
+class TestProjectList:
+    """Project listing tests."""
+
+    def test_list_projects_filters_by_authenticated_user_email(self, client, db_session):
+        db_session.add(Project(
+            creation_type='idea',
+            user_email='other@example.com',
+            idea_prompt='Foreign project',
+            status='DRAFT',
+        ))
+        db_session.commit()
+
+        own_response = client.post('/api/projects', json={
+            'creation_type': 'idea',
+            'idea_prompt': 'Owned project',
+        })
+        own_project_id = assert_success_response(own_response, 201)['data']['project_id']
+
+        response = client.get('/api/projects')
+
+        data = assert_success_response(response)
+        project_ids = [project['project_id'] for project in data['data']['projects']]
+        user_emails = {project['user_email'] for project in data['data']['projects']}
+
+        assert own_project_id in project_ids
+        assert user_emails == {'test@example.com'}
 
 
 class TestProjectDelete:
-    """项目删除测试"""
-    
+    """Project deletion tests."""
+
     def test_delete_project_success(self, client, sample_project):
-        """测试删除项目成功"""
         if not sample_project:
-            pytest.skip("项目创建失败")
-        
+            pytest.skip("Project creation failed")
+
         project_id = sample_project['project_id']
         response = client.delete(f'/api/projects/{project_id}')
-        
-        data = assert_success_response(response)
-        
-        # 确认项目已删除
+
+        assert_success_response(response)
+
         get_response = client.get(f'/api/projects/{project_id}')
         assert get_response.status_code == 404
-    
-    def test_delete_project_not_found(self, client):
-        """测试删除不存在的项目"""
-        response = client.delete('/api/projects/non-existent-id')
-        
-        assert response.status_code == 404
 
+    def test_delete_project_not_found(self, client):
+        response = client.delete('/api/projects/non-existent-id')
+        assert response.status_code == 404

@@ -21,6 +21,7 @@ from flask import Flask
 from flask_cors import CORS
 from models import db
 from config import Config
+from controllers.auth_controller import auth_bp, register_auth_middleware
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
@@ -97,6 +98,7 @@ def create_app():
     CORS(app, origins=cors_origins)
     # Database migrations (Alembic via Flask-Migrate)
     Migrate(app, db)
+    register_auth_middleware(app)
     
     # Register blueprints
     app.register_blueprint(project_bp)
@@ -109,6 +111,7 @@ def create_app():
     app.register_blueprint(material_global_bp)
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
+    app.register_blueprint(auth_bp)
 
     with app.app_context():
         # Load settings from database and sync to app.config

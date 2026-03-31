@@ -466,12 +466,12 @@ export const Home: React.FC = () => {
             <div className="flex items-center">
               <img
                 src="/logo.png"
-                alt="蕉幻 Banana Slides Logo"
+                alt="星幻 Yostar Slides Logo"
                 className="h-10 md:h-12 w-auto rounded-lg object-contain"
               />
             </div>
             <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
-              蕉幻
+              星幻
             </span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
@@ -532,7 +532,7 @@ export const Home: React.FC = () => {
               backgroundSize: '200% auto',
               animation: 'gradient 3s ease infinite',
             }}>
-              蕉幻 · Banana Slides
+              星幻 · Yostar Slides
             </span>
           </h1>
           

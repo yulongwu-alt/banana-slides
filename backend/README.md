@@ -1,6 +1,6 @@
-# Banana Slides Backend
+# Yostar Slides Backend
 
-蕉幻（Banana Slides）后端服务 - AI驱动的PPT生成系统
+星幻（Yostar Slides）后端服务 - AI驱动的PPT生成系统
 
 ## 技术栈
 

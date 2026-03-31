@@ -86,6 +86,11 @@ class Config:
     
     # CORS配置
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', '')
+    SSO_AUTHORIZE_URL = os.getenv('SSO_AUTHORIZE_URL', '')
+    SSO_TOKEN_URL = os.getenv('SSO_TOKEN_URL', '')
+    SSO_CLIENT_ID = os.getenv('SSO_CLIENT_ID', '')
+    SSO_CLIENT_SECRET = os.getenv('SSO_CLIENT_SECRET', '')
     
     # 输出语言配置
     # 可选值: 'zh' (中文), 'ja' (日本語), 'en' (English), 'auto' (自动)

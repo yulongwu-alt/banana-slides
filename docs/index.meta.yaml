@@ -1,0 +1,49 @@
+version: 1
+generated_at: "2026-03-31T14:40:00+08:00"
+repo_summary: "AI-powered PPT generation app with a Flask backend, React frontend, and Docker/local CI tooling."
+modules:
+  - id: backend-api
+    display_name: Backend API
+    description: "Flask bootstrap, bearer-token auth middleware, SSO endpoints, and token-scoped HTTP controllers for project, page, file, export, and settings behavior; load for request routing, auth, SSO, project ownership, or runtime config questions."
+    triggers: ["api", "flask", "auth", "sso", "middleware", "bearer token", "project routes", "project ownership", "user email", "page routes", "settings", "reference files", "export"]
+    paths: ["backend/app.py", "backend/config.py", "backend/controllers/**"]
+    entrypoints: ["backend/app.py:create_app", "backend/controllers/auth_controller.py:auth_bp", "backend/controllers/project_controller.py:project_bp", "backend/controllers/page_controller.py:page_bp", "backend/controllers/export_controller.py:export_bp"]
+    artifacts: ["backend/app.py", "backend/config.py", "backend/controllers/"]
+    doc: "docs/modules/backend-api.md"
+    evidence: ["backend/app.py:L52-L154", "backend/controllers/auth_controller.py:L15-L292", "backend/controllers/project_controller.py:L32-L56", "backend/controllers/project_controller.py:L144-L379", "backend/controllers/page_controller.py:L20-L20", "backend/controllers/export_controller.py:L19-L19"]
+  - id: backend-services
+    display_name: Backend Services
+    description: "AI orchestration, background tasks, file parsing, export generation, storage helpers, and editable-image processing; load for generation workflows, provider selection, parsing, or export internals."
+    triggers: ["ai service", "task manager", "mineru", "image editability", "inpainting", "export service", "file service"]
+    paths: ["backend/services/**", "backend/utils/**"]
+    entrypoints: ["backend/services/ai_service_manager.py:get_ai_service", "backend/services/task_manager.py:TaskManager.submit_task", "backend/services/file_parser_service.py:FileParserService.parse_file", "backend/services/image_editability/service.py:ImageEditabilityService.make_image_editable"]
+    artifacts: ["backend/services/", "backend/services/image_editability/", "backend/utils/"]
+    doc: "docs/modules/backend-services.md"
+    evidence: ["backend/services/ai_service_manager.py:L30-L37", "backend/services/task_manager.py:L18-L36", "backend/services/file_parser_service.py:L50-L90", "backend/services/image_editability/service.py:L25-L80"]
+  - id: backend-data
+    display_name: Backend Data
+    description: "SQLAlchemy models and Alembic migrations for projects, pages, tasks, files, settings, and version history; load for schema, persistence, or relationship questions."
+    triggers: ["models", "database", "sqlite", "alembic", "projects table", "settings table", "page image versions"]
+    paths: ["backend/models/**", "backend/migrations/**"]
+    entrypoints: ["backend/models/__init__.py:db", "backend/models/project.py:Project", "backend/models/page.py:Page", "backend/migrations/versions/001_baseline_schema.py:upgrade"]
+    artifacts: ["backend/models/", "backend/migrations/", "backend/migrations/versions/"]
+    doc: "docs/modules/backend-data.md"
+    evidence: ["backend/models/__init__.py:L2-L28", "backend/models/project.py:L9-L70", "backend/models/page.py:L10-L82", "backend/migrations/versions/001_baseline_schema.py:L20-L135"]
+  - id: frontend-app
+    display_name: Frontend App
+    description: "React/Vite client with route-level SSO cookie auth, Zustand state, API bindings, typed models, and shared UI exports; load for frontend routing, auth gating, cookies, or client API questions."
+    triggers: ["react", "vite", "zustand", "home page", "project store", "frontend routes", "axios client", "frontend auth", "cookie auth", "sso"]
+    paths: ["frontend/src/**", "frontend/public/**"]
+    entrypoints: ["frontend/src/main.tsx", "frontend/src/App.tsx", "frontend/src/utils/auth.ts:ensureAuthenticated", "frontend/src/store/useProjectStore.ts", "frontend/src/api/endpoints.ts"]
+    artifacts: ["frontend/src/pages/", "frontend/src/store/", "frontend/src/api/", "frontend/src/components/shared/"]
+    doc: "docs/modules/frontend-app.md"
+    evidence: ["frontend/src/main.tsx:L1-L10", "frontend/src/App.tsx:L13-L120", "frontend/src/utils/auth.ts:L1-L157", "frontend/src/store/useProjectStore.ts:L6-L61", "frontend/src/api/endpoints.ts:L10-L27"]
+  - id: repo-tooling
+    display_name: Repo Tooling
+    description: "Docker, npm, uv, and shell automation for local development, builds, checks, and environment tests; load for setup, CI, or container workflow questions."
+    triggers: ["docker", "compose", "quick-check", "local ci", "pre-push", "build scripts", "dev scripts"]
+    paths: ["docker-compose.yml", "package.json", "backend/Dockerfile", "frontend/Dockerfile", "scripts/**", "tests/docker/**"]
+    entrypoints: ["package.json:scripts", "docker-compose.yml", "scripts/run-local-ci.sh", "scripts/pre-push-check.sh"]
+    artifacts: ["docker-compose.yml", "package.json", "backend/Dockerfile", "frontend/Dockerfile", "scripts/"]
+    doc: "docs/modules/repo-tooling.md"
+    evidence: ["package.json:L6-L25", "docker-compose.yml:L1-L65", "scripts/run-local-ci.sh:L30-L180", "scripts/pre-push-check.sh:L26-L76"]

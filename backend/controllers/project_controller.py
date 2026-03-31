@@ -6,7 +6,7 @@ import logging
 import traceback
 from datetime import datetime
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
 from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
 from werkzeug.exceptions import BadRequest
@@ -27,6 +27,33 @@ from utils import (
 logger = logging.getLogger(__name__)
 
 project_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
+
+
+def _get_authenticated_user_email() -> str | None:
+    """Return the authenticated user email from Flask request context."""
+    user_email = getattr(g, 'user', None)
+    if isinstance(user_email, str) and user_email:
+        return user_email
+
+    user_data = getattr(g, 'user_data', None)
+    if isinstance(user_data, dict):
+        email = user_data.get('email')
+        if isinstance(email, str) and email:
+            return email
+
+    return None
+
+
+def _get_project_by_user_email(project_id: str, user_email: str, include_pages: bool = False) -> Project | None:
+    """Load a project only when it belongs to the authenticated user."""
+    query = Project.query
+    if include_pages:
+        query = query.options(joinedload(Project.pages))
+
+    return query.filter(
+        Project.id == project_id,
+        Project.user_email == user_email,
+    ).first()
 
 
 def _get_project_reference_files_content(project_id: str) -> list:
@@ -115,7 +142,7 @@ def _reconstruct_outline_from_pages(pages: list) -> list:
 
 
 @project_bp.route('', methods=['GET'])
-def list_projects():
+def get_projects_by_user_email():
     """
     GET /api/projects - Get all projects (for history)
     
@@ -124,6 +151,10 @@ def list_projects():
     - offset: offset for pagination (default: 0)
     """
     try:
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
         # Parameter validation
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
@@ -136,6 +167,7 @@ def list_projects():
         # This avoids a second database query
         projects_with_extra = Project.query\
             .options(joinedload(Project.pages))\
+            .filter(Project.user_email == user_email)\
             .order_by(desc(Project.updated_at))\
             .limit(limit + 1)\
             .offset(offset)\
@@ -173,6 +205,10 @@ def create_project():
     }
     """
     try:
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
         data = request.get_json()
         
         if not data:
@@ -190,6 +226,7 @@ def create_project():
         # Create project
         project = Project(
             creation_type=creation_type,
+            user_email=user_email,
             idea_prompt=data.get('idea_prompt'),
             outline_text=data.get('outline_text'),
             description_text=data.get('description_text'),
@@ -202,6 +239,7 @@ def create_project():
         
         return success_response({
             'project_id': project.id,
+            'user_email': project.user_email,
             'status': project.status,
             'pages': []
         }, status_code=201)
@@ -220,16 +258,16 @@ def create_project():
 
 
 @project_bp.route('/<project_id>', methods=['GET'])
-def get_project(project_id):
+def get_project_by_user_email(project_id):
     """
     GET /api/projects/{project_id} - Get project details
     """
     try:
-        # Use eager loading to load project and related pages
-        project = Project.query\
-            .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
-            .first()
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email, include_pages=True)
         
         if not project:
             return not_found('Project')
@@ -253,11 +291,11 @@ def update_project(project_id):
     }
     """
     try:
-        # Use eager loading to load project and pages (for page order updates)
-        project = Project.query\
-            .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
-            .first()
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email, include_pages=True)
         
         if not project:
             return not_found('Project')
@@ -267,7 +305,7 @@ def update_project(project_id):
         # Update idea_prompt if provided
         if 'idea_prompt' in data:
             project.idea_prompt = data['idea_prompt']
-        
+
         # Update extra_requirements if provided
         if 'extra_requirements' in data:
             project.extra_requirements = data['extra_requirements']
@@ -316,7 +354,11 @@ def delete_project(project_id):
     DELETE /api/projects/{project_id} - Delete project
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -353,7 +395,11 @@ def generate_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -463,7 +509,11 @@ def generate_from_description(project_id):
     """
     
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -573,7 +623,11 @@ def generate_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -666,7 +720,11 @@ def generate_images(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -764,9 +822,20 @@ def get_task_status(project_id, task_id):
     GET /api/projects/{project_id}/tasks/{task_id} - Get task status
     """
     try:
-        task = Task.query.get(task_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
+        if not project:
+            return not_found('Project')
+
+        task = Task.query.filter(
+            Task.id == task_id,
+            Task.project_id == project_id,
+        ).first()
         
-        if not task or task.project_id != project_id:
+        if not task:
             return not_found('Task')
         
         return success_response(task.to_dict())
@@ -788,7 +857,11 @@ def refine_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')
@@ -942,7 +1015,11 @@ def refine_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('UNAUTHORIZED', 'Authenticated user email is required', 401)
+
+        project = _get_project_by_user_email(project_id, user_email)
         
         if not project:
             return not_found('Project')

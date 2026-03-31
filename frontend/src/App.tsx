@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { History } from './pages/History';
 import { OutlineEditor } from './pages/OutlineEditor';
@@ -8,29 +8,92 @@ import { SlidePreview } from './pages/SlidePreview';
 import { SettingsPage } from './pages/Settings';
 import { useProjectStore } from './store/useProjectStore';
 import { useToast, GithubLink } from './components/shared';
+import { ensureAuthenticated } from './utils/auth';
 
-function App() {
+function AppRoutes() {
   const { currentProject, syncProject, error, setError } = useProjectStore();
   const { show, ToastContainer } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [authReady, setAuthReady] = useState(false);
 
-  // 恢复项目状态
   useEffect(() => {
+    let cancelled = false;
+
+    const runAuthCheck = async () => {
+      setAuthReady(false);
+
+      try {
+        const params = new URLSearchParams(location.search);
+        const code = params.get('code');
+        const result = await ensureAuthenticated(code);
+
+        if (cancelled || result !== 'authenticated') {
+          return;
+        }
+
+        if (code) {
+          params.delete('code');
+          params.delete('state');
+          const nextSearch = params.toString();
+          navigate(
+            {
+              pathname: location.pathname,
+              search: nextSearch ? `?${nextSearch}` : '',
+            },
+            { replace: true },
+          );
+        }
+
+        setAuthReady(true);
+      } catch (authError) {
+        console.error('Auth check failed', authError);
+      }
+    };
+
+    void runAuthCheck();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     const savedProjectId = localStorage.getItem('currentProjectId');
     if (savedProjectId && !currentProject) {
       syncProject();
     }
-  }, [currentProject, syncProject]);
+  }, [authReady, currentProject, syncProject]);
 
-  // 显示全局错误
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     if (error) {
       show({ message: error, type: 'error' });
       setError(null);
     }
-  }, [error, setError, show]);
+  }, [authReady, error, setError, show]);
+
+  if (!authReady) {
+    return (
+      <>
+        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-100">
+          Authenticating...
+        </div>
+        <ToastContainer />
+        <GithubLink />
+      </>
+    );
+  }
 
   return (
-    <BrowserRouter>
+    <>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/history" element={<History />} />
@@ -42,9 +105,16 @@ function App() {
       </Routes>
       <ToastContainer />
       <GithubLink />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }
 
 export default App;
-

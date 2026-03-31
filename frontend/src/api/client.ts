@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAccessToken } from '@/utils/auth';
 
 // 开发环境：通过 Vite proxy 转发
 // 生产环境：通过 nginx proxy 转发
@@ -13,6 +14,11 @@ export const apiClient = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
+    const accessToken = getAccessToken();
+    if (accessToken) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
     // 如果请求体是 FormData，删除 Content-Type 让浏览器自动设置
     // 浏览器会自动添加正确的 Content-Type 和 boundary
     if (config.data instanceof FormData) {
