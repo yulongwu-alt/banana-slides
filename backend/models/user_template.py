@@ -13,6 +13,7 @@ class UserTemplate(db.Model):
     __tablename__ = 'user_templates'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_email = db.Column(db.String(255), nullable=True)
     name = db.Column(db.String(200), nullable=True)  # Optional template name
     file_path = db.Column(db.String(500), nullable=False)
     file_size = db.Column(db.Integer, nullable=True)  # File size in bytes
@@ -23,6 +24,7 @@ class UserTemplate(db.Model):
         """Convert to dictionary"""
         return {
             'template_id': self.id,
+            'user_email': self.user_email,
             'name': self.name,
             'template_image_url': f'/files/user-templates/{self.id}/{self.file_path.split("/")[-1]}',
             'created_at': self.created_at.isoformat() if self.created_at else None,

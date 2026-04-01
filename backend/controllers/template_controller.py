@@ -2,7 +2,9 @@
 Template Controller - handles template-related endpoints
 """
 import logging
-from flask import Blueprint, request, current_app
+import traceback
+import uuid
+from flask import Blueprint, request, current_app, g
 from models import db, Project, UserTemplate
 from utils import success_response, error_response, not_found, bad_request, allowed_file
 from services import FileService
@@ -12,6 +14,29 @@ logger = logging.getLogger(__name__)
 
 template_bp = Blueprint('templates', __name__, url_prefix='/api/projects')
 user_template_bp = Blueprint('user_templates', __name__, url_prefix='/api/user-templates')
+
+
+def _get_authenticated_user_email() -> str | None:
+    """Return the authenticated user email from Flask request context."""
+    user_email = getattr(g, 'user', None)
+    if isinstance(user_email, str) and user_email:
+        return user_email
+
+    user_data = getattr(g, 'user_data', None)
+    if isinstance(user_data, dict):
+        email = user_data.get('email')
+        if isinstance(email, str) and email:
+            return email
+
+    return None
+
+
+def _get_user_template_by_user_email(template_id: str, user_email: str) -> UserTemplate | None:
+    """Load a user template only when it belongs to the authenticated user."""
+    return UserTemplate.query.filter(
+        UserTemplate.id == template_id,
+        UserTemplate.user_email == user_email,
+    ).first()
 
 
 @template_bp.route('/<project_id>/template', methods=['POST'])
@@ -118,6 +143,10 @@ def upload_user_template():
     Optional: name=Template Name
     """
     try:
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('AUTH_REQUIRED', 'Authenticated user email is required', 401)
+
         # Check if file is in request
         if 'template_image' not in request.files:
             return bad_request("No file uploaded")
@@ -139,8 +168,6 @@ def upload_user_template():
         file_size = file.tell()
         file.seek(0)  # Reset to beginning
         
-        # Generate template ID first
-        import uuid
         template_id = str(uuid.uuid4())
         
         # Save template file first (using the generated ID)
@@ -150,6 +177,7 @@ def upload_user_template():
         # Create template record with file_path already set
         template = UserTemplate(
             id=template_id,
+            user_email=user_email,
             name=name,
             file_path=file_path,
             file_size=file_size
@@ -160,7 +188,6 @@ def upload_user_template():
         return success_response(template.to_dict())
     
     except Exception as e:
-        import traceback
         db.session.rollback()
         error_msg = str(e)
         logger.error(f"Error uploading user template: {error_msg}", exc_info=True)
@@ -177,7 +204,13 @@ def list_user_templates():
     GET /api/user-templates - Get list of user templates
     """
     try:
-        templates = UserTemplate.query.order_by(UserTemplate.created_at.desc()).all()
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('AUTH_REQUIRED', 'Authenticated user email is required', 401)
+
+        templates = UserTemplate.query.filter(
+            UserTemplate.user_email == user_email,
+        ).order_by(UserTemplate.created_at.desc()).all()
         
         return success_response({
             'templates': [template.to_dict() for template in templates]
@@ -193,7 +226,11 @@ def delete_user_template(template_id):
     DELETE /api/user-templates/{template_id} - Delete user template
     """
     try:
-        template = UserTemplate.query.get(template_id)
+        user_email = _get_authenticated_user_email()
+        if not user_email:
+            return error_response('AUTH_REQUIRED', 'Authenticated user email is required', 401)
+
+        template = _get_user_template_by_user_email(template_id, user_email)
         
         if not template:
             return not_found('UserTemplate')

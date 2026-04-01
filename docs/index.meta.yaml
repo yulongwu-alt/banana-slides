@@ -4,13 +4,13 @@ repo_summary: "AI-powered PPT generation app with a Flask backend, React fronten
 modules:
   - id: backend-api
     display_name: Backend API
-    description: "Flask bootstrap, bearer-token auth middleware, SSO endpoints, and token-scoped HTTP controllers for project, page, file, export, and settings behavior; load for request routing, auth, SSO, project ownership, or runtime config questions."
-    triggers: ["api", "flask", "auth", "sso", "middleware", "bearer token", "project routes", "project ownership", "user email", "page routes", "settings", "reference files", "export"]
+    description: "Flask bootstrap, bearer-token auth middleware, SSO endpoints, and token-scoped HTTP controllers for project, template, page, file, export, and settings behavior; load for request routing, auth, SSO, project/template ownership, or runtime config questions."
+    triggers: ["api", "flask", "auth", "sso", "middleware", "bearer token", "project routes", "project ownership", "template routes", "user templates", "template ownership", "user email", "page routes", "settings", "reference files", "export"]
     paths: ["backend/app.py", "backend/config.py", "backend/controllers/**"]
-    entrypoints: ["backend/app.py:create_app", "backend/app.py:app", "backend/controllers/auth_controller.py:auth_bp", "backend/controllers/project_controller.py:project_bp", "backend/controllers/page_controller.py:page_bp", "backend/controllers/export_controller.py:export_bp"]
+    entrypoints: ["backend/app.py:create_app", "backend/app.py:app", "backend/controllers/auth_controller.py:auth_bp", "backend/controllers/project_controller.py:project_bp", "backend/controllers/template_controller.py:template_bp", "backend/controllers/template_controller.py:user_template_bp", "backend/controllers/page_controller.py:page_bp", "backend/controllers/export_controller.py:export_bp"]
     artifacts: ["backend/app.py", "backend/config.py", "backend/controllers/"]
     doc: "docs/modules/backend-api.md"
-    evidence: ["backend/app.py:L52-L154", "backend/app.py:L221-L248", "backend/controllers/auth_controller.py:L15-L292", "backend/controllers/project_controller.py:L32-L56", "backend/controllers/project_controller.py:L144-L379", "backend/controllers/page_controller.py:L20-L20", "backend/controllers/export_controller.py:L19-L19"]
+    evidence: ["backend/app.py:L52-L154", "backend/app.py:L221-L248", "backend/controllers/auth_controller.py:L15-L292", "backend/controllers/project_controller.py:L32-L56", "backend/controllers/project_controller.py:L144-L379", "backend/controllers/template_controller.py:L15-L250", "backend/controllers/page_controller.py:L20-L20", "backend/controllers/export_controller.py:L19-L19"]
   - id: backend-services
     display_name: Backend Services
     description: "AI orchestration, background tasks, file parsing, export generation, storage helpers, and editable-image processing; load for generation workflows, provider selection, parsing, or export internals."
@@ -22,13 +22,13 @@ modules:
     evidence: ["backend/services/ai_service_manager.py:L30-L37", "backend/services/task_manager.py:L18-L36", "backend/services/file_parser_service.py:L50-L90", "backend/services/image_editability/service.py:L25-L80"]
   - id: backend-data
     display_name: Backend Data
-    description: "SQLAlchemy models and Alembic migrations for projects, pages, tasks, files, settings, and version history; load for schema, persistence, or relationship questions."
-    triggers: ["models", "database", "sqlite", "alembic", "projects table", "settings table", "page image versions"]
+    description: "SQLAlchemy models and Alembic migrations for projects, user templates, pages, tasks, files, settings, and version history; load for schema, persistence, ownership columns, or relationship questions."
+    triggers: ["models", "database", "sqlite", "alembic", "projects table", "user_templates table", "user template model", "settings table", "page image versions"]
     paths: ["backend/models/**", "backend/migrations/**"]
-    entrypoints: ["backend/models/__init__.py:db", "backend/models/project.py:Project", "backend/models/page.py:Page", "backend/migrations/versions/001_baseline_schema.py:upgrade"]
+    entrypoints: ["backend/models/__init__.py:db", "backend/models/project.py:Project", "backend/models/user_template.py:UserTemplate", "backend/models/page.py:Page", "backend/migrations/versions/001_baseline_schema.py:upgrade", "backend/migrations/versions/008_add_user_email_to_user_templates.py:upgrade"]
     artifacts: ["backend/models/", "backend/migrations/", "backend/migrations/versions/"]
     doc: "docs/modules/backend-data.md"
-    evidence: ["backend/models/__init__.py:L2-L28", "backend/models/project.py:L9-L70", "backend/models/page.py:L10-L82", "backend/migrations/versions/001_baseline_schema.py:L20-L135"]
+    evidence: ["backend/models/__init__.py:L2-L28", "backend/models/project.py:L9-L70", "backend/models/user_template.py:L9-L35", "backend/models/page.py:L10-L82", "backend/migrations/versions/001_baseline_schema.py:L20-L135", "backend/migrations/versions/008_add_user_email_to_user_templates.py:L28-L35"]
   - id: frontend-app
     display_name: Frontend App
     description: "React/Vite client with route-level SSO cookie auth, Zustand state, API bindings, typed models, and shared UI exports; load for frontend routing, auth gating, cookies, or client API questions."
