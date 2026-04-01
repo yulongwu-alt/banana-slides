@@ -68,5 +68,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD ["sh", "-c", "curl -f http://localhost:${PORT:-5000}/health || exit 1"]
 
 # 启动应用
-CMD ["sh", "-c", "uv run --directory backend alembic upgrade head && uv run --directory backend python app.py"]
+CMD ["sh", "-c", "uv run --directory backend alembic upgrade head && uv run gunicorn --chdir backend --bind 0.0.0.0:${PORT:-5000} --workers ${GUNICORN_WORKERS:-2} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-300} app:app"]
 

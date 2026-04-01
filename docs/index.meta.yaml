@@ -7,10 +7,10 @@ modules:
     description: "Flask bootstrap, bearer-token auth middleware, SSO endpoints, and token-scoped HTTP controllers for project, page, file, export, and settings behavior; load for request routing, auth, SSO, project ownership, or runtime config questions."
     triggers: ["api", "flask", "auth", "sso", "middleware", "bearer token", "project routes", "project ownership", "user email", "page routes", "settings", "reference files", "export"]
     paths: ["backend/app.py", "backend/config.py", "backend/controllers/**"]
-    entrypoints: ["backend/app.py:create_app", "backend/controllers/auth_controller.py:auth_bp", "backend/controllers/project_controller.py:project_bp", "backend/controllers/page_controller.py:page_bp", "backend/controllers/export_controller.py:export_bp"]
+    entrypoints: ["backend/app.py:create_app", "backend/app.py:app", "backend/controllers/auth_controller.py:auth_bp", "backend/controllers/project_controller.py:project_bp", "backend/controllers/page_controller.py:page_bp", "backend/controllers/export_controller.py:export_bp"]
     artifacts: ["backend/app.py", "backend/config.py", "backend/controllers/"]
     doc: "docs/modules/backend-api.md"
-    evidence: ["backend/app.py:L52-L154", "backend/controllers/auth_controller.py:L15-L292", "backend/controllers/project_controller.py:L32-L56", "backend/controllers/project_controller.py:L144-L379", "backend/controllers/page_controller.py:L20-L20", "backend/controllers/export_controller.py:L19-L19"]
+    evidence: ["backend/app.py:L52-L154", "backend/app.py:L221-L248", "backend/controllers/auth_controller.py:L15-L292", "backend/controllers/project_controller.py:L32-L56", "backend/controllers/project_controller.py:L144-L379", "backend/controllers/page_controller.py:L20-L20", "backend/controllers/export_controller.py:L19-L19"]
   - id: backend-services
     display_name: Backend Services
     description: "AI orchestration, background tasks, file parsing, export generation, storage helpers, and editable-image processing; load for generation workflows, provider selection, parsing, or export internals."
