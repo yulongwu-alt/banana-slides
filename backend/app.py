@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import sqlite3
-from sqlalchemy.exc import SQLAlchemyError
 from flask_migrate import Migrate
 
 # Load environment variables from project root .env file
@@ -52,24 +51,24 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 def create_app():
     """Application factory"""
     app = Flask(__name__)
-    
+
     # Load configuration from Config class
     app.config.from_object(Config)
-    
+
     # Override with environment-specific paths (use absolute path)
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     instance_dir = os.path.join(backend_dir, 'instance')
     os.makedirs(instance_dir, exist_ok=True)
-    
+
     db_path = os.path.join(instance_dir, 'database.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    
+
     # Ensure upload folder exists
     project_root = os.path.dirname(backend_dir)
     upload_folder = os.path.join(project_root, 'uploads')
     os.makedirs(upload_folder, exist_ok=True)
     app.config['UPLOAD_FOLDER'] = upload_folder
-    
+
     # CORS configuration (parse from environment)
     raw_cors = os.getenv('CORS_ORIGINS', 'http://localhost:3000')
     if raw_cors.strip() == '*':
@@ -77,7 +76,7 @@ def create_app():
     else:
         cors_origins = [o.strip() for o in raw_cors.split(',') if o.strip()]
     app.config['CORS_ORIGINS'] = cors_origins
-    
+
     # Initialize logging (log to stdout so Docker can capture it)
     log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)
     logging.basicConfig(
@@ -85,21 +84,19 @@ def create_app():
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    
-    # 设置第三方库的日志级别，避免过多的DEBUG日志
+
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
     logging.getLogger('httpcore').setLevel(logging.WARNING)
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('werkzeug').setLevel(logging.INFO)  # Flask开发服务器日志保持INFO
+    logging.getLogger('werkzeug').setLevel(logging.INFO)
 
     # Initialize extensions
     db.init_app(app)
     CORS(app, origins=cors_origins)
-    # Database migrations (Alembic via Flask-Migrate)
     Migrate(app, db)
     register_auth_middleware(app)
-    
+
     # Register blueprints
     app.register_blueprint(project_bp)
     app.register_blueprint(page_bp)
@@ -113,31 +110,16 @@ def create_app():
     app.register_blueprint(settings_bp)
     app.register_blueprint(auth_bp)
 
-    with app.app_context():
-        # Load settings from database and sync to app.config
-        _load_settings_to_config(app)
+    _log_runtime_config(app)
 
-    # Health check endpoint
     @app.route('/health')
     def health_check():
         return {'status': 'ok', 'message': 'Banana Slides API is running'}
-    
-    # Output language endpoint
+
     @app.route('/api/output-language', methods=['GET'])
     def get_output_language():
-        """
-        获取用户的输出语言偏好（从数据库 Settings 读取）
-        返回: zh, ja, en, auto
-        """
-        from models import Settings
-        try:
-            settings = Settings.get_settings()
-            return {'data': {'language': settings.output_language}}
-        except SQLAlchemyError as db_error:
-            logging.warning(f"Failed to load output language from settings: {db_error}")
-            return {'data': {'language': Config.OUTPUT_LANGUAGE}}  # 默认中文
+        return {'data': {'language': app.config.get('OUTPUT_LANGUAGE', Config.OUTPUT_LANGUAGE)}}
 
-    # Root endpoint
     @app.route('/')
     def index():
         return {
@@ -150,72 +132,40 @@ def create_app():
                 'projects': '/api/projects'
             }
         }
-    
+
     return app
 
 
-def _load_settings_to_config(app):
-    """Load settings from database and apply to app.config on startup"""
-    from models import Settings
-    try:
-        settings = Settings.get_settings()
-        
-        # Load AI provider format (always sync, has default value)
-        if settings.ai_provider_format:
-            app.config['AI_PROVIDER_FORMAT'] = settings.ai_provider_format
-            logging.info(f"Loaded AI_PROVIDER_FORMAT from settings: {settings.ai_provider_format}")
-        
-        # Load API configuration
-        # Note: We load even if value is None/empty to allow clearing settings
-        # But we only log if there's an actual value
-        # Only load database settings if specific provider env vars are NOT set
-        # This allows using separate keys for different providers via .env
-        google_key_from_env = os.getenv('GOOGLE_API_KEY')
-        openai_key_from_env = os.getenv('OPENAI_API_KEY')
-        google_base_from_env = os.getenv('GOOGLE_API_BASE')
-        openai_base_from_env = os.getenv('OPENAI_API_BASE')
-        
-        # Log which keys are available
-        logging.info(f"API Keys - GOOGLE from env: {'YES (***' + google_key_from_env[-4:] + ')' if google_key_from_env else 'NO'}, "
-                    f"OPENAI from env: {'YES (***' + openai_key_from_env[-4:] + ')' if openai_key_from_env else 'NO'}, "
-                    f"DB key: {'YES (***' + settings.api_key[-4:] + ')' if settings.api_key else 'NO'}")
-        
-        if settings.api_base_url is not None:
-            # Only apply to providers that don't have env-specific settings
-            if not google_base_from_env:
-                app.config['GOOGLE_API_BASE'] = settings.api_base_url
-                logging.info(f"Applied DB API_BASE to GOOGLE_API_BASE: {settings.api_base_url}")
-            if not openai_base_from_env:
-                app.config['OPENAI_API_BASE'] = settings.api_base_url
-                logging.info(f"Applied DB API_BASE to OPENAI_API_BASE: {settings.api_base_url}")
+def _mask_secret(value):
+    """Mask secret values before logging."""
+    if not value:
+        return 'NOT SET'
+    if len(value) <= 4:
+        return '***'
+    return f"***{value[-4:]}"
 
-        if settings.api_key is not None:
-            # Only apply to providers that don't have env-specific settings
-            if not google_key_from_env:
-                app.config['GOOGLE_API_KEY'] = settings.api_key
-                logging.info("Applied DB api_key to GOOGLE_API_KEY")
-            if not openai_key_from_env:
-                app.config['OPENAI_API_KEY'] = settings.api_key
-                logging.info("Applied DB api_key to OPENAI_API_KEY")
-        
-        # Log final configuration
-        final_google_key = app.config.get('GOOGLE_API_KEY')
-        final_openai_key = app.config.get('OPENAI_API_KEY')
-        logging.info(f"Final API Keys - GOOGLE_API_KEY: {'***' + final_google_key[-4:] if final_google_key else 'NOT SET'}, "
-                    f"OPENAI_API_KEY: {'***' + final_openai_key[-4:] if final_openai_key else 'NOT SET'}")
 
-        # Load image generation settings
-        app.config['DEFAULT_RESOLUTION'] = settings.image_resolution
-        app.config['DEFAULT_ASPECT_RATIO'] = settings.image_aspect_ratio
-        logging.info(f"Loaded image settings: {settings.image_resolution}, {settings.image_aspect_ratio}")
-
-        # Load worker settings
-        app.config['MAX_DESCRIPTION_WORKERS'] = settings.max_description_workers
-        app.config['MAX_IMAGE_WORKERS'] = settings.max_image_workers
-        logging.info(f"Loaded worker settings: desc={settings.max_description_workers}, img={settings.max_image_workers}")
-
-    except Exception as e:
-        logging.warning(f"Could not load settings from database: {e}")
+def _log_runtime_config(app):
+    """Log the effective runtime configuration loaded from env/config."""
+    logging.info(
+        "Runtime config loaded from env/config file: "
+        f"AI_PROVIDER_FORMAT={app.config.get('AI_PROVIDER_FORMAT')}, "
+        f"OPENAI_API_BASE={app.config.get('OPENAI_API_BASE') or 'NOT SET'}, "
+        f"GOOGLE_API_BASE={app.config.get('GOOGLE_API_BASE') or 'NOT SET'}, "
+        f"OPENAI_API_KEY={_mask_secret(app.config.get('OPENAI_API_KEY'))}, "
+        f"GOOGLE_API_KEY={_mask_secret(app.config.get('GOOGLE_API_KEY'))}, "
+        f"MINERU_API_BASE={app.config.get('MINERU_API_BASE') or 'NOT SET'}, "
+        f"MINERU_TOKEN={_mask_secret(app.config.get('MINERU_TOKEN'))}, "
+        f"TEXT_MODEL={app.config.get('TEXT_MODEL')}, "
+        f"IMAGE_MODEL={app.config.get('IMAGE_MODEL')}, "
+        f"IMAGE_CAPTION_MODEL={app.config.get('IMAGE_CAPTION_MODEL')}, "
+        f"OUTPUT_LANGUAGE={app.config.get('OUTPUT_LANGUAGE')}, "
+        f"MAX_DESCRIPTION_WORKERS={app.config.get('MAX_DESCRIPTION_WORKERS')}, "
+        f"MAX_IMAGE_WORKERS={app.config.get('MAX_IMAGE_WORKERS')}, "
+        f"AUTH_SERVICE_URL={app.config.get('AUTH_SERVICE_URL') or 'NOT SET'}, "
+        f"SSO_AUTHORIZE_URL={app.config.get('SSO_AUTHORIZE_URL') or 'NOT SET'}, "
+        f"SSO_TOKEN_URL={app.config.get('SSO_TOKEN_URL') or 'NOT SET'}"
+    )
 
 
 # Create app instance
@@ -225,24 +175,20 @@ app = create_app()
 if __name__ == '__main__':
     # Run development server
     if os.getenv("IN_DOCKER", "0") == "1":
-        port = 5000 # 在 docker 内部部署时始终使用 5000 端口.
+        port = 5000
     else:
         port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
-    
+
     logging.info(
         "\n"
-        "╔══════════════════════════════════════╗\n"
-        "║   🍌 Banana Slides API Server 🍌   ║\n"
-        "╚══════════════════════════════════════╝\n"
         f"Server starting on: http://localhost:{port}\n"
-        f"Output Language: {Config.OUTPUT_LANGUAGE}\n"
+        f"Output Language: {app.config.get('OUTPUT_LANGUAGE')}\n"
         f"Environment: {os.getenv('FLASK_ENV', 'development')}\n"
         f"Debug mode: {debug}\n"
         f"API Base URL: http://localhost:{port}/api\n"
         f"Database: {app.config['SQLALCHEMY_DATABASE_URI']}\n"
         f"Uploads: {app.config['UPLOAD_FOLDER']}"
     )
-    
-    # Using absolute paths for database, so WSL path issues should not occur
+
     app.run(host='0.0.0.0', port=port, debug=debug, use_reloader=False)
